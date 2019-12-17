@@ -1,6 +1,8 @@
 # Invariant Information Clustering for Unsupervised Image Classification and Segmentation
 
 This repository contains PyTorch code for the <a href="https://arxiv.org/abs/1807.06653">IIC paper</a>.
+Most of the code is ported to Python 3. 
+I can confirm that the script ```cluster_greyscale_twohead.py``` now works.
 
 IIC is an unsupervised clustering objective that trains neural networks into image classifiers and segmenters without labels, with state-of-the-art semantic accuracy. 
 
