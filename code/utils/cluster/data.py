@@ -266,13 +266,16 @@ def _create_dataloaders(config, dataset_class, tf1, tf2,
         root=config.dataset_root,
         transform=tf1,
         split=train_partition,
-        target_transform=target_transform)
+        target_transform=target_transform,
+        download=True)
     else:
       train_imgs_curr = dataset_class(
         root=config.dataset_root,
         transform=tf1,
         train=train_partition,
-        target_transform=target_transform)
+        target_transform=target_transform,
+	download=True)
+
 
     if hasattr(config, "mix_train"):
       if config.mix_train and (train_partition == "train+unlabeled"):
@@ -281,7 +284,7 @@ def _create_dataloaders(config, dataset_class, tf1, tf2,
 
   train_imgs = ConcatDataset(train_imgs_list)
   train_dataloader = torch.utils.data.DataLoader(train_imgs,
-                                                 batch_size=config.dataloader_batch_sz,
+                                                 batch_size=int(config.dataloader_batch_sz),
                                                  shuffle=shuffle,
                                                  num_workers=0,
                                                  drop_last=False)
@@ -291,7 +294,7 @@ def _create_dataloaders(config, dataset_class, tf1, tf2,
                        torch.utils.data.sampler.SequentialSampler))
   dataloaders = [train_dataloader]
 
-  for d_i in xrange(config.num_dataloaders):
+  for d_i in range(config.num_dataloaders):
     print("Creating auxiliary dataloader ind %d out of %d time %s" %
           (d_i, config.num_dataloaders, datetime.now()))
     sys.stdout.flush()
@@ -319,7 +322,7 @@ def _create_dataloaders(config, dataset_class, tf1, tf2,
     train_imgs_tf = ConcatDataset(train_tf_imgs_list)
     train_tf_dataloader = \
       torch.utils.data.DataLoader(train_imgs_tf,
-                                  batch_size=config.dataloader_batch_sz,
+                                  batch_size=int(config.dataloader_batch_sz),
                                   shuffle=shuffle,
                                   num_workers=0,
                                   drop_last=False)

@@ -38,7 +38,7 @@ parser.add_argument("--mode", type=str, default="IID")
 
 parser.add_argument("--dataset", type=str, default="MNIST")
 parser.add_argument("--dataset_root", type=str,
-                    default="/scratch/local/ssd/xuji/MNIST")
+                    default="/home/daniesis/IIC/datasets/MNIST")
 
 parser.add_argument("--gt_k", type=int, default=10)
 parser.add_argument("--output_k_A", type=int, required=True)
@@ -57,7 +57,7 @@ parser.add_argument("--num_dataloaders", type=int, default=3)
 parser.add_argument("--num_sub_heads", type=int, default=5)
 
 parser.add_argument("--out_root", type=str,
-                    default="/scratch/shared/slow/xuji/iid_private")
+                    default="/home/daniesis/IIC/out")
 parser.add_argument("--restart", dest="restart", default=False,
                     action="store_true")
 parser.add_argument("--restart_from_best", dest="restart_from_best",
@@ -153,9 +153,10 @@ if config.restart:
   print("Loading restarting config from: %s" % reloaded_config_path)
   with open(reloaded_config_path, "rb") as config_f:
     config = pickle.load(config_f)
+
   assert (config.model_ind == given_config.model_ind)
   config.restart = True
-
+  
   # copy over new num_epochs and lr schedule
   config.num_epochs = given_config.num_epochs
   config.lr_schedule = given_config.lr_schedule
@@ -191,8 +192,9 @@ def train(render_count=-1):
   optimiser = get_opt(config.opt)(net.module.parameters(), lr=config.lr)
   if config.restart:
     print("loading latest opt")
-    optimiser.load_state_dict(
-      torch.load(os.path.join(config.out_dir, opt_name)))
+    if os.path.exists(os.path.join(config.out_dir, opt_name)):
+	    optimiser.load_state_dict(
+	      torch.load(os.path.join(config.out_dir, opt_name)))
 
   heads = ["B", "A"]
   if config.head_A_first:
@@ -280,8 +282,7 @@ def train(render_count=-1):
 
   # Train
   # ------------------------------------------------------------------------
-
-  for e_i in xrange(next_epoch, config.num_epochs):
+  for e_i in range(next_epoch, config.num_epochs):
     print("Starting e_i: %d" % e_i)
 
     if e_i in config.lr_schedule:
@@ -310,19 +311,20 @@ def train(render_count=-1):
         iterators = (d for d in dataloaders)
 
         b_i = 0
-        for tup in itertools.izip(*iterators):
+        for tup in zip(*iterators):
           net.module.zero_grad()
 
           all_imgs = torch.zeros((config.batch_sz, config.in_channels,
                                   config.input_sz,
-                                  config.input_sz)).cuda()
+                                  config.input_sz), requires_grad=True).cuda()
           all_imgs_tf = torch.zeros((config.batch_sz, config.in_channels,
                                      config.input_sz,
-                                     config.input_sz)).cuda()
+                                     config.input_sz),
+                                    requires_grad=True).cuda()
 
           imgs_curr = tup[0][0]  # always the first
           curr_batch_sz = imgs_curr.size(0)
-          for d_i in xrange(config.num_dataloaders):
+          for d_i in range(config.num_dataloaders):
             imgs_tf_curr = tup[1 + d_i][0]  # from 2nd to last
             assert (curr_batch_sz == imgs_tf_curr.size(0))
 
@@ -341,12 +343,14 @@ def train(render_count=-1):
           all_imgs = all_imgs[:curr_total_batch_sz, :, :, :]
           all_imgs_tf = all_imgs_tf[:curr_total_batch_sz, :, :, :]
 
+          assert (all_imgs.requires_grad and all_imgs_tf.requires_grad)
+
           x_outs = net(all_imgs)
           x_tf_outs = net(all_imgs_tf)
 
           avg_loss_batch = None  # avg over the heads
           avg_loss_no_lamb_batch = None
-          for i in xrange(config.num_sub_heads):
+          for i in range(config.num_sub_heads):
             loss, loss_no_lamb = IID_loss(x_outs[i], x_tf_outs[i],
                                           lamb=lamb)
             if avg_loss_batch is None:
@@ -394,7 +398,6 @@ def train(render_count=-1):
 
       epoch_loss.append(avg_loss)
       epoch_loss_no_lamb.append(avg_loss_no_lamb)
-
     # Eval
     # -----------------------------------------------------------------------
 
@@ -449,6 +452,7 @@ def train(render_count=-1):
       axarr[7].set_title("double eval acc (avg)), top: %f" %
                          max(config.double_eval_avg_subhead_acc))
 
+    print("%%%%%%%%%%%%%%% SAVING FIGURE %%%%%%%%%%%%%%")
     fig.tight_layout()
     fig.canvas.draw_idle()
     fig.savefig(os.path.join(config.out_dir, "plots.png"))
